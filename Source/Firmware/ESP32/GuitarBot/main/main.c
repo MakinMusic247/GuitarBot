@@ -1,16 +1,12 @@
-#include <stdio.h>
-#include <inttypes.h>
-#include "sdkconfig.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "esp_chip_info.h"
-#include "esp_flash.h"
-#include "esp_system.h"
-#include "esp_log.h"
-#include "driver/i2c_master.h"
+/*
+    GuitarBot main.c
+    An array stores each beat, and each note played on the beat (multiple notes = a chord)
+    The song bpm determines how many beats are played per minute (e.g. 60 bpm = 1 beat per second)
 
-#include "pca9685.h"
-#include "servo.h"
+*/
+
+#include "main.h"
+
 
 #define I2C_MASTER_SCL_IO   9
 #define I2C_MASTER_SDA_IO   8
@@ -19,21 +15,47 @@
 
 static const char *MAIN_TAG = "Main";
 
-typedef struct {
-    servo_t servo;              // servo reference
-    uint8_t fret;               // which fret the servo is placed on (1-24)
-    uint8_t left_string;        // string is pressed down by the left side of the servo (EADGBe --> 1,2,3,4,5,6)
-    uint8_t right_string;       // string is pressed down by the right side of the servo
-    uint8_t prefered_string;    // which string is preferred to be played if both strings are requested at the same time
-} guitar_fret_servo_t;
+servo_t servos[N_SERVOS]; 
+float bpm = 60.0f; 
 
-typedef struct {
-    servo_t servo;          // servo reference
-    uint8_t left_string;    // string is pressed down by the left side of the servo
-    uint8_t right_string;   // string is pressed down by the right side of the servo
-} guitar_string_servo_t;
+TaskHandle_t xHandle = NULL;
 
-servo_t servos[N_SERVOS];
+
+
+/// @brief Task to play each beat, run every x = bpm/60 seconds
+/// @param pvParameters 
+void play_song_task(void * pvParameters)
+{
+    uint16_t beat = 0; // Start at beat zero
+
+    TickType_t xLastWakeTime = xTaskGetTickCount(); // Initialize the last wake time with the current tick count
+    const TickType_t xFrequency = pdMS_TO_TICKS(1000); // Convert 1 second (1000 ms) into FreeRTOS ticks
+
+    while (1) {
+        // Wait for the next cycle (exactly 1 second from the last wake time)
+        vTaskDelayUntil(&xLastWakeTime, xFrequency);
+
+        // Your code here runs every 1 second
+        ESP_LOGI(MAIN_TAG, "Playing beat %u", beat);
+
+        if(beat % 2 == 0) {
+            servo_set_angle(&servos[0], 45);
+            servo_set_angle(&servos[1], 135);
+            servo_set_angle(&servos[2], 45);
+            ESP_LOGI(MAIN_TAG, "Servos set to 90");
+        }
+        else {
+            servo_set_angle(&servos[0], 135);
+            servo_set_angle(&servos[1], 45);
+            servo_set_angle(&servos[2], 135);
+            ESP_LOGI(MAIN_TAG, "Servos set to 180");
+        }
+
+        beat++;
+    }
+}
+
+
 
 
 esp_err_t setup()
@@ -84,7 +106,7 @@ esp_err_t setup()
             ESP_LOGE(MAIN_TAG, "servo_init failed for channel %d: %s", i, esp_err_to_name(err));
             return err;
         }
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(100));
     }
 
     if(err != ESP_OK)
@@ -113,11 +135,19 @@ void app_main(void)
     ESP_LOGI(MAIN_TAG, "Starting...\n");
     esp_err_t err;
 
+    // Setup the servos
     err = setup();
     if(err != ESP_OK) ESP_LOGE(MAIN_TAG, "Setup failed: %s", esp_err_to_name(err));
 
+
+    // Create the task to play the song
+    // xTaskCreate(&play_song_task, "play_song_task", 4096, NULL, 5, NULL);
+    // configASSERT( xHandle );
+
+
     while(1)
     {
+        vTaskDelay(pdMS_TO_TICKS(1000));
         // for(int i=0; i < N_SERVOS; i++){
         //     vTaskDelay(pdMS_TO_TICKS(1000));
         //     servo_set_angle(&servos[i], 0);

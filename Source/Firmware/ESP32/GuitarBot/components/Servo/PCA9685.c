@@ -289,7 +289,7 @@ esp_err_t pca9685_deinit(i2c_master_dev_handle_t *dev_handle, pca9685_dev_t *dev
 */
 esp_err_t pca9685_set_pwm(pca9685_dev_t *dev, uint8_t channel, uint16_t on, uint16_t off)
 {
-    ESP_LOGI(PCA9685_TAG, "Setting PWM channel %u \non=%u, off=%u", channel, on, off);
+    ESP_LOGI(PCA9685_TAG, "Setting PWM channel %u, on=%u, off=%u", channel, on, off);
     esp_err_t err;
 
     if(!dev) return ESP_ERR_INVALID_ARG;
@@ -310,7 +310,7 @@ esp_err_t pca9685_set_pwm(pca9685_dev_t *dev, uint8_t channel, uint16_t on, uint
 
 esp_err_t pca9685_set_pwm_test(pca9685_dev_t *dev, uint8_t channel, uint16_t on, uint16_t off)
 {
-    ESP_LOGI(PCA9685_TAG, "Setting PWM channel %u \non=%u, off=%u", channel, on, off);
+    ESP_LOGI(PCA9685_TAG, "Setting PWM channel %u, on=%u, off=%u", channel, on, off);
     esp_err_t err;
 
     if(!dev) return ESP_ERR_INVALID_ARG;
@@ -338,7 +338,7 @@ esp_err_t pca9685_set_pwm_test(pca9685_dev_t *dev, uint8_t channel, uint16_t on,
 /// @return 
 esp_err_t pca9685_set_pwm_pulse(pca9685_dev_t *dev, uint8_t channel, uint16_t pulse_us)
 {
-    ESP_LOGI(PCA9685_TAG, "Setting PWM channel %u \npulse=%u", channel, pulse_us);
+    ESP_LOGI(PCA9685_TAG, "Setting PWM channel %u, pulse=%u", channel, pulse_us);
     esp_err_t err;
 
     if(!dev) return ESP_ERR_INVALID_ARG;

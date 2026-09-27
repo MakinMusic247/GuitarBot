@@ -8,9 +8,9 @@
 #include "main.h"
 
 
-#define I2C_MASTER_SCL_IO   9
-#define I2C_MASTER_SDA_IO   8
-#define N_SERVOS            3
+#define I2C_MASTER_SCL_IO   10 //9
+#define I2C_MASTER_SDA_IO   11 //8
+#define N_SERVOS            6
 
 
 static const char *MAIN_TAG = "Main";
@@ -53,6 +53,22 @@ void play_song_task(void * pvParameters)
 
         beat++;
     }
+}
+
+
+void lvgl_task(void *arg)
+{
+    while (1) {
+        uint32_t delay_ms = lv_timer_handler();
+        vTaskDelay(pdMS_TO_TICKS(delay_ms));
+    }
+}
+
+
+
+void Waveshare_Driver_Init(void)
+{
+    Flash_Searching(); // SD card
 }
 
 
@@ -120,12 +136,24 @@ esp_err_t setup()
     // err = pca9685_set_pwm_test(&pca9685_dev, 0, 0, 307);
     for(int i = 0; i < N_SERVOS; i++){
         err = servo_set_angle(&servos[i], 90);
-        vTaskDelay(pdMS_TO_TICKS(5000));
+        vTaskDelay(pdMS_TO_TICKS(500));
     }
 
     return ESP_OK;
+}
 
 
+esp_err_t setupUI()
+{
+    Waveshare_Driver_Init();
+    SD_Init();
+    LCD_Init();
+    LVGL_Init();   // returns the screen object
+    // xTaskCreate(lvgl_task, "lvgl_task", 8192, NULL, 5, NULL); // The task running lv_timer_handler should have lower priority than that running `lv_tick_inc`
+    xTaskCreatePinnedToCore(lvgl_task, "lvgl_task", 8192, NULL, 5, NULL, 1); // pin to core 1
+    ui_init(servos, sizeof(servos) / sizeof(servos[0])); // create the screen
+
+    return ESP_OK;
 }
 
 
@@ -138,16 +166,25 @@ void app_main(void)
     // Setup the servos
     err = setup();
     if(err != ESP_OK) ESP_LOGE(MAIN_TAG, "Setup failed: %s", esp_err_to_name(err));
+    
+    
+    err = setupUI();
+    if(err != ESP_OK) ESP_LOGE(MAIN_TAG, "UI setup failed: %s", esp_err_to_name(err));
 
+    
 
     // Create the task to play the song
     // xTaskCreate(&play_song_task, "play_song_task", 4096, NULL, 5, NULL);
-    // configASSERT( xHandle );
+    // xTaskCreatePinnedToCore(&play_song_task, "play_song_task", 4096, NULL, 6, NULL, 0);
 
 
     while(1)
     {
-        vTaskDelay(pdMS_TO_TICKS(1000));
+        vTaskDelay(pdMS_TO_TICKS(100));
+
+        // The task running lv_timer_handler should have lower priority than that running `lv_tick_inc`
+        // lv_timer_handler();
+
         // for(int i=0; i < N_SERVOS; i++){
         //     vTaskDelay(pdMS_TO_TICKS(1000));
         //     servo_set_angle(&servos[i], 0);

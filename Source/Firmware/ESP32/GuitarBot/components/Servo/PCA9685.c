@@ -144,8 +144,7 @@ esp_err_t pca9685_reset(pca9685_dev_t *dev)
     ESP_LOGI(PCA9685_TAG, "resetting");
     if(!dev) return ESP_ERR_INVALID_ARG;
 
-
-    return err;
+    return ESP_OK;
 }
 
 

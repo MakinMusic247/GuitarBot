@@ -10,6 +10,7 @@ idf_component_register(
                               "./LVGL_UI/UI_main.c"
                               "./LVGL_UI/tablature_view.c"
                               "./LVGL_UI/settings_view.c"
+                              "./LVGL_UI/settings_page.c"
                               # "./LVGL_UI/LVGL_Example.c"
                               # "./LVGL_UI/LVGL_Music.c"
                               "./SD_Card/SD_MMC.c" 

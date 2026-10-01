@@ -1,0 +1,151 @@
+{
+    "info": {
+        "title": "",
+        "track_name": "Nylon Guitar",
+        "tempo": 60
+    },
+    "tab": {
+        "measures": [
+            {
+                "number": 0,
+                "beats": [
+                    {
+                        "string": 6,
+                        "fret": 0
+                    },
+                    {
+                        "string": 5,
+                        "fret": 0
+                    },
+                    {
+                        "string": 4,
+                        "fret": 0
+                    },
+                    {
+                        "string": 3,
+                        "fret": 0
+                    }
+                ]
+            },
+            {
+                "number": 1,
+                "beats": [
+                    {
+                        "string": 2,
+                        "fret": 0
+                    },
+                    {
+                        "string": 1,
+                        "fret": 0
+                    }
+                ]
+            },
+            {
+                "number": 2,
+                "beats": [
+                    {
+                        "string": 1,
+                        "fret": 0
+                    },
+                    {
+                        "string": 2,
+                        "fret": 0
+                    },
+                    {
+                        "string": 3,
+                        "fret": 0
+                    },
+                    {
+                        "string": 4,
+                        "fret": 0
+                    }
+                ]
+            },
+            {
+                "number": 3,
+                "beats": [
+                    {
+                        "string": 5,
+                        "fret": 0
+                    },
+                    {
+                        "string": 6,
+                        "fret": 0
+                    }
+                ]
+            },
+            {
+                "number": 4,
+                "beats": [
+                    {
+                        "string": 6,
+                        "fret": 1
+                    },
+                    {
+                        "string": 5,
+                        "fret": 1
+                    },
+                    {
+                        "string": 4,
+                        "fret": 1
+                    },
+                    {
+                        "string": 3,
+                        "fret": 1
+                    }
+                ]
+            },
+            {
+                "number": 5,
+                "beats": [
+                    {
+                        "string": 2,
+                        "fret": 1
+                    },
+                    {
+                        "string": 1,
+                        "fret": 1
+                    }
+                ]
+            },
+            {
+                "number": 6,
+                "beats": [
+                    {
+                        "string": 1,
+                        "fret": 1
+                    },
+                    {
+                        "string": 2,
+                        "fret": 1
+                    },
+                    {
+                        "string": 3,
+                        "fret": 1
+                    },
+                    {
+                        "string": 4,
+                        "fret": 1
+                    }
+                ]
+            },
+            {
+                "number": 7,
+                "beats": [
+                    {
+                        "string": 5,
+                        "fret": 1
+                    },
+                    {
+                        "string": 6,
+                        "fret": 1
+                    }
+                ]
+            },
+            {
+                "number": 8,
+                "beats": []
+            }
+        ]
+    }
+}

@@ -9,6 +9,8 @@
 #include "LVGL_Driver.h"
 #include "SD_MMC.h"
 
+#include "Guitarbot.h"
+
 
 #define EXAMPLE1_LVGL_TICK_PERIOD_MS  1000
 

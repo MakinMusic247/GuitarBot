@@ -23,6 +23,18 @@
 #define CONFIG_SD_Card_D3       21  
 
 
+#define MAX_FILE_NAME_SIZE      100  // Define maximum file name size
+#define MAX_PATH_SIZE           512  // Define a larger size for the full path
+#define MAX_DIRECTORY_SIZE      20   // maximum number of files in a directory to read
+
+typedef struct {
+    char* file_name;
+    char* file_path;
+    char* extension;
+    bool is_folder;
+} file_t;
+
+
 esp_err_t SD_Card_CS_EN(void);
 esp_err_t SD_Card_CS_Dis(void);
 
@@ -35,3 +47,5 @@ void SD_Init(void);
 void Flash_Searching(void);
 FILE* Open_File(const char *file_path);
 uint16_t Folder_retrieval(const char* directory, const char* fileExtension, char File_Name[][100],uint16_t maxFiles);
+
+uint16_t Get_Folder(const char* directory, file_t **out_files);

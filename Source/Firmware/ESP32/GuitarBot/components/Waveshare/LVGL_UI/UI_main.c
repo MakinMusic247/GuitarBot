@@ -4,7 +4,7 @@
 #include <lvgl.h>
 #include "tablature_view.h"
 #include "settings_view.h"
-
+#include "settings_page.h"
 
 
 
@@ -20,8 +20,8 @@ typedef enum {
 /**********************
  *  STATIC PROTOTYPES
  **********************/
-static void Tabviewer_create(lv_obj_t * parent); // Guitar tablature viewer page
-static void Settings_create(lv_obj_t * parent, servo_t servos[], int n_servos);  // Settings page
+static void Tabviewer_create(lv_obj_t * parent, servo_t servos[]); // Guitar tablature viewer page
+static void Settings_create(lv_obj_t * parent, servo_t servos[]);  // Settings page
 
 // static void ta_event_cb(lv_event_t * e);
 // void example1_increase_lvgl_tick(lv_timer_t * t);
@@ -52,7 +52,7 @@ static lv_color_t original_screen_bg_color;
 
 
 
-void ui_init(servo_t servos[], int n_servos){
+void ui_init(servo_t servos[]){
 
   disp_size = DISP_SMALL;                            
 
@@ -93,32 +93,33 @@ void ui_init(servo_t servos[], int n_servos){
   lv_obj_t * t1 = lv_tabview_add_tab(tv, "My Tabs");
   lv_obj_t * t2 = lv_tabview_add_tab(tv, "Settings");
 
-  Tabviewer_create(t1);
-  Settings_create(t2, servos, n_servos);
+  Tabviewer_create(t1, servos);
+  Settings_create(t2, servos);
   
 }
 
 
 /// @brief Create the guitar tab view page
 /// @param parent 
-static void Tabviewer_create(lv_obj_t * parent)
+static void Tabviewer_create(lv_obj_t * parent, servo_t servos[])
 {
     original_screen_bg_color = lv_obj_get_style_bg_color(parent, 0);
     lv_obj_set_style_bg_color(parent, lv_color_hex(0x343247), 0);
     
-    // _lv_tablature_view_create(parent);
+    _lv_tablature_view_create(parent);
+    // _lv_settings_page_create(parent, servos);
   
 }
 
 
 /// @brief Create the settings page
 /// @param parent 
-static void Settings_create(lv_obj_t * parent, servo_t servos[], int n_servos)
+static void Settings_create(lv_obj_t * parent, servo_t servos[])
 {
   original_screen_bg_color = lv_obj_get_style_bg_color(parent, 0);
   lv_obj_set_style_bg_color(parent, lv_color_hex(0x343247), 0);
 
-  _lv_settings_view_create(parent, servos, n_servos);
+  _lv_settings_view_create(parent, servos);
 }
 
 

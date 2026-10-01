@@ -1,0 +1,41 @@
+menu "GuitarBot Configuration"
+    config GUITARBOT_NUM_SERVOS
+        int "The number of servo motors to use"
+        range 1 24
+        default 6
+        help
+            The number of servo motors connected to the ESP32 for use with the GuitarBot. 
+            Guitarbot supports multiple PCA9685 servo driver boards that can support up to 12 servo motor channels each
+    
+    config GUITARBOT_NUM_BRIDGE_SERVOS
+        int "The number of servo motors to use for the bridge"
+        range 1 6
+        default 3
+        help
+            The number of servo motors connected to the ESP32 for use with the GuitarBot bridge.
+            Use 3 if one servo covers two open strings, or 6 if each open string has one servo
+    
+    config SERVO_ANGLE_DEFAULT
+        int "Default servo motor angle"
+        range 0 180
+        default 90
+        help
+    
+    config SERVO_ANGLE_TOP
+        int "Servo motor angle for top string"
+        range 0 180
+        default 160
+        help
+
+    config SERVO_ANGLE_BOTTOM
+        int "Servo motor angle for bottom string"
+        range 0 180
+        default 35
+        help
+
+            
+    config GUITARBOT_NUM_PCA9685_BOARDS       
+        int "The number of PCA9685 servo motor driver boards to use (16 channels per board)"
+        default 1
+    
+endmenu

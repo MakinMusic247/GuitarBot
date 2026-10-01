@@ -1,6 +1,9 @@
 #include "settings_view.h"
 #include <lvgl.h>
 
+lv_obj_t * panel1 = NULL; // Overall panel of page
+lv_obj_t * curr_servo = NULL; // Current 
+
 // Styles
 static lv_style_t style_text_muted;
 static lv_style_t style_title;
@@ -19,7 +22,9 @@ typedef struct {
 
 static void arc_value_changed_event_cb(lv_event_t * e);
 static void lv_servo_arc(lv_obj_t * parent);
-static void create_servo_view(lv_obj_t * parent, servo_t *servo, uint8_t servo_num);
+void servo_create_setting(servo_t *servo, uint8_t servo_num);
+static lv_obj_t * create_servo_view(lv_obj_t * parent, servo_t *servo, servo_settings_t *settings, uint8_t servo_num);
+lv_obj_t * lv_create_pages(lv_obj_t * parent);
 
 static const char * btnm_map[] = { "-", "+", "\n", "reset", "" };
 
@@ -33,7 +38,7 @@ static servo_settings_t *servo_settings = NULL; // holds the servo UI settings
 
 
 
-/***************************/
+/*******************************************************************************************/
 // Static functions
 
 
@@ -48,7 +53,7 @@ static void update_servo(servo_settings_t *settings, float new_angle)
     ESP_LOGI("Settings UI", "Setting servo angle");
     servo_set_angle(settings->servo, new_angle);
     set_indicator_value(settings->indicator, (int32_t)new_angle, settings->meter);
-    lv_label_set_text_fmt(settings->angle_label, "%f deg", new_angle);
+    lv_label_set_text(settings->angle_label, "%f deg");
 }
 
 
@@ -72,19 +77,19 @@ static void btn_matrix_event_handler(lv_event_t * e)
         // LV_LOG_USER("%s was pressed\n", txt);
         ESP_LOGI("Settings UI", "%s was pressed (id %u)\n", txt, id);
         if(id == 0){
-            ESP_LOGI("Settings UI", "decrease angle", txt);
+            ESP_LOGI("Settings UI", "decrease angle");
             new_angle = current_angle - 5;
         }
         else if(id == 1){
-            ESP_LOGI("Settings UI", "increase angle", txt);
+            ESP_LOGI("Settings UI", "increase angle");
             new_angle = current_angle + 5;
         }
         else if(id == 2){
-            ESP_LOGI("Settings UI", "reset to default", txt);
+            ESP_LOGI("Settings UI", "reset to default");
             new_angle = 90.0;
         }
         else{
-            ESP_LOGI("Settings UI", "no action", txt);
+            ESP_LOGI("Settings UI", "no action");
             return;
         }
 
@@ -97,47 +102,78 @@ static void btn_matrix_event_handler(lv_event_t * e)
 }
 
 
-/***************************/
+/****************************************************************************************/
 
 
-lv_obj_t *_lv_settings_view_create(lv_obj_t * parent, servo_t servos[], int n_servos)
+lv_obj_t *_lv_settings_view_create(lv_obj_t * parent, servo_t servos[])
 {
     /*Create a panel*/
-    lv_obj_t * panel1 = lv_obj_create(parent);
+    panel1 = lv_obj_create(parent);
     lv_obj_set_height(panel1, lv_pct(100)); //LV_SIZE_CONTENT);
     lv_obj_set_width(panel1, lv_pct(100));
 
     // Set a flex flow to add new items horizontally
-    lv_obj_set_flex_flow(panel1, LV_FLEX_FLOW_ROW);
+    lv_obj_set_flex_flow(panel1, LV_FLEX_FLOW_COLUMN); // LV_FLEX_FLOW_ROW
     lv_obj_set_style_pad_row(panel1, 4, 0);
+    
 
     servos_arr = servos;
-    servo_count = n_servos;
+    servo_count = N_SERVOS;
 
-    if(n_servos > 0){
-        servo_settings = calloc(n_servos, sizeof(servo_settings_t)); // initialize the array with empty values
+    if(N_SERVOS > 0){
+        servo_settings = calloc(N_SERVOS, sizeof(servo_settings_t)); // initialize the array with empty values
 
-        // Create the content
-        for(int i=0; i<n_servos; i++){
-            create_servo_view(panel1, &servos[i], i);
+        // Initialize the servo settings
+        for(int i=0; i<N_SERVOS; i++){
+            servo_create_setting(&servos[i], i); 
         }
+
+        // Create the first page
+        lv_obj_t * servo_view = create_servo_view(panel1, &servos[0], &servo_settings[0], 0);
+        curr_servo = servo_view;
+
+        // Create the page controls
+        lv_obj_t * page_buttons = lv_create_pages(panel1);
+
     }
 
     return panel1;
 }
 
 
-void create_servo_view(lv_obj_t * parent, servo_t *servo, uint8_t servo_num)
+
+/// @brief Initialize the servo setting struct
+/// @param servo 
+/// @param servo_num 
+void servo_create_setting(servo_t *servo, uint8_t servo_num)
 {
-    // initialize a new servo_settings instance
+    ESP_LOGI("Settings UI", "Initialize servo setting channel %u", servo_num);
+
     if(servo_settings == NULL || servo_num >= servo_count || servo == NULL){
+        ESP_LOGE("Settings UI", "Create servo setting failed - check servo is initialized");
         return;
     }
 
-    // servo_settings[servo_num].servo_channel = servo_num;
     servo_settings_t *settings = &servo_settings[servo_num]; // Get the pointer to the current servo being set up
     settings->servo = servo;
     settings->servo_channel = servo_num;
+}
+
+
+
+/// @brief Create the servo setting view
+/// @param parent 
+/// @param servo 
+/// @param servo_num 
+lv_obj_t * create_servo_view(lv_obj_t * parent, servo_t *servo, servo_settings_t *settings, uint8_t servo_num)
+{
+    // initialize a new servo_settings instance
+    if(servo_settings == NULL || servo_num >= servo_count || servo == NULL){
+        return NULL;
+    }
+
+    // Delete existing screen
+    if(curr_servo) lv_obj_del(curr_servo);
 
     lv_obj_t *card = lv_obj_create(parent);
     lv_obj_set_width(card, LV_SIZE_CONTENT);
@@ -185,6 +221,8 @@ void create_servo_view(lv_obj_t * parent, servo_t *servo, uint8_t servo_num)
     lv_obj_set_style_pad_column(btnm1, 6, LV_PART_MAIN);
     lv_obj_add_event_cb(btnm1, btn_matrix_event_handler, LV_EVENT_ALL, settings); // Add the settings to the *user_data param - lets us track which servo is updated
 
+    curr_servo = card;
+    return card;
 }
 
 
@@ -201,16 +239,91 @@ static void arc_value_changed_event_cb(lv_event_t * e)
 
 
 
-/* Angle indicator */
-// lv_obj_t * label = lv_label_create(card);
-// lv_obj_t * arc = lv_arc_create(card);
-// lv_obj_set_size(arc, 80, 80);
-// lv_arc_set_rotation(arc, 180);
-// lv_arc_set_bg_angles(arc, 0, 180);
-// lv_arc_set_range(arc, 0, 180);
-// lv_arc_set_value(arc, 90);
-// // lv_obj_center(arc);
-// lv_obj_clear_flag(arc, LV_OBJ_FLAG_CLICKABLE); // make readonly
-// lv_obj_remove_style(arc, NULL, LV_PART_KNOB);
-// lv_obj_add_event_cb(arc, arc_value_changed_event_cb, LV_EVENT_VALUE_CHANGED, label);
-// lv_event_send(arc, LV_EVENT_VALUE_CHANGED, NULL); // Manually update the label for the first time
+/************************************************************************************************/
+// Pagination
+
+static char servo_labels[N_SERVOS][4];          // buffer per label - fits "1".."999" + null terminator
+static const char * map[N_SERVOS + 3];           // left arrow + N labels + right arrow + terminator
+
+
+
+static void page_changed_cb(lv_event_t * e)
+{
+    lv_obj_t * obj = lv_event_get_target(e);
+    uint32_t id = lv_btnmatrix_get_selected_btn(obj);
+    bool prev = id == 0 ? true : false;
+    bool next = id == N_SERVOS + 1 ? true : false;
+
+    int servo_num = id - 1; // get the servo number
+    ESP_LOGI("Settings UI", "Page changed (page id=%u) (servo id=%u)", id, servo_num);
+
+    create_servo_view(panel1, &servos_arr[servo_num], &servo_settings[servo_num], servo_num);
+
+    if(prev || next) {
+        /*Find the checked button*/
+        uint32_t i;
+        for(i = 1; i < N_SERVOS + 2; i++) {
+            if(lv_btnmatrix_has_btn_ctrl(obj, i, LV_BTNMATRIX_CTRL_CHECKED)) break;
+        }
+
+        if(prev && i > 1) i--;
+        else if(next && i < N_SERVOS) i++;
+
+        lv_btnmatrix_set_btn_ctrl(obj, i, LV_BTNMATRIX_CTRL_CHECKED);
+    }
+}
+
+/**
+ * Make a button group (pagination)
+ */
+lv_obj_t * lv_create_pages(lv_obj_t * parent)
+{
+    static lv_style_t style_bg;
+    lv_style_init(&style_bg);
+    lv_style_set_pad_all(&style_bg, 0);
+    lv_style_set_pad_gap(&style_bg, 0);
+    lv_style_set_clip_corner(&style_bg, true);
+    lv_style_set_radius(&style_bg, LV_RADIUS_CIRCLE);
+    lv_style_set_border_width(&style_bg, 0);
+
+    static lv_style_t style_btn;
+    lv_style_init(&style_btn);
+    lv_style_set_radius(&style_btn, 0);
+    lv_style_set_border_width(&style_btn, 1);
+    lv_style_set_border_opa(&style_btn, LV_OPA_50);
+    lv_style_set_border_color(&style_btn, lv_palette_main(LV_PALETTE_GREY));
+    lv_style_set_border_side(&style_btn, LV_BORDER_SIDE_INTERNAL);
+    lv_style_set_radius(&style_btn, 0);
+
+    // Create the button matrix map
+    // static const char * map[] = {LV_SYMBOL_LEFT, "1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12", LV_SYMBOL_RIGHT, ""};
+    map[0] = LV_SYMBOL_LEFT;
+    for(int i=0; i<N_SERVOS; i++){
+        snprintf(servo_labels[i], sizeof(servo_labels[i]), "%d", i);
+        map[i+1] = servo_labels[i];
+    }
+    map[N_SERVOS + 1] = LV_SYMBOL_RIGHT;
+    map[N_SERVOS + 2] = "";
+    
+
+    lv_obj_t * btnm = lv_btnmatrix_create(parent);
+    lv_btnmatrix_set_map(btnm, map);
+    lv_obj_add_style(btnm, &style_bg, 0);
+    lv_obj_add_style(btnm, &style_btn, LV_PART_ITEMS);
+    lv_obj_add_event_cb(btnm, page_changed_cb, LV_EVENT_VALUE_CHANGED, NULL);
+    lv_obj_set_size(btnm, 225, 35);
+
+    /*Allow selecting on one number at time*/
+    lv_btnmatrix_set_btn_ctrl_all(btnm, LV_BTNMATRIX_CTRL_CHECKABLE);
+    lv_btnmatrix_clear_btn_ctrl(btnm, 0, LV_BTNMATRIX_CTRL_CHECKABLE);
+    lv_btnmatrix_clear_btn_ctrl(btnm, 6, LV_BTNMATRIX_CTRL_CHECKABLE);
+
+    lv_btnmatrix_set_one_checked(btnm, true);
+    lv_btnmatrix_set_btn_ctrl(btnm, 1, LV_BTNMATRIX_CTRL_CHECKED);
+
+    // lv_obj_center(btnm);
+    lv_obj_align(btnm, LV_ALIGN_BOTTOM_MID, 0, -10);
+
+    return btnm;
+
+}

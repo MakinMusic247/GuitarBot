@@ -1,5 +1,5 @@
-#ifndef __SETTINGS_VIEW_H__
-#define __SETTINGS_VIEW_H__
+#ifndef __SETTINGS_PAGE_H__
+#define __SETTINGS_PAGE_H__
 
 
 #include <string.h>
@@ -16,7 +16,7 @@
 /// @brief Create a settings view to test and control servos
 /// @param parent 
 /// @return 
-lv_obj_t *_lv_settings_view_create(lv_obj_t * parent, servo_t servos[]);
+lv_obj_t *_lv_settings_page_create(lv_obj_t * parent, servo_t servos[]);
 
 
 #endif

@@ -133,8 +133,7 @@ FILE* Open_File(const char *file_path) {
     return fp; 
 }
 
-#define MAX_FILE_NAME_SIZE 100  // Define maximum file name size
-#define MAX_PATH_SIZE 512      // Define a larger size for the full path
+
 uint16_t Folder_retrieval(const char* directory, const char* fileExtension, char File_Name[][MAX_FILE_NAME_SIZE], uint16_t maxFiles)    
 {
     DIR *dir = opendir(directory);  // Opens the specified directory
@@ -185,3 +184,137 @@ uint16_t Folder_retrieval(const char* directory, const char* fileExtension, char
 
     return fileCount;  
 }
+
+
+void free_file_list(file_t *files, uint16_t count)
+{
+    if(!files) return;
+    for(uint16_t i = 0; i < count; i++){
+        free(files[i].file_name);
+        free(files[i].file_path);
+    }
+    free(files);
+}
+
+
+
+/// @brief Get the files/directories of the SD card
+/// @param directory  
+/// @return 
+uint16_t Get_Folder(const char* directory, file_t **out_files) 
+{
+    DIR *dir = opendir(directory);  // Opens the specified directory
+    if (dir == NULL) {
+        ESP_LOGE(SD_TAG, "Path: <%s> does not exist", directory);  
+        return 0; 
+    }
+
+    file_t *files = calloc(MAX_DIRECTORY_SIZE, sizeof(file_t)); // initialize an empty array to populate
+    uint16_t fileCount = 0;  // File counter
+    struct dirent *entry;    // Directory entry pointer
+
+    // traverse through the directory
+    while ((entry = readdir(dir)) != NULL && fileCount < MAX_DIRECTORY_SIZE) {
+
+        // Skip "." and ".." Special directory
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+            continue;
+        }
+
+        char full_path[MAX_PATH_SIZE];
+        snprintf(full_path, sizeof(full_path), "%s/%s", directory, entry->d_name);
+
+        struct stat entry_stat;
+        if(stat(full_path, &entry_stat) == 0) {
+            if(S_ISDIR(entry_stat.st_mode)) { // is directory?
+                files[fileCount].file_name = strdup(entry->d_name);
+                files[fileCount].is_folder = true;
+            } else{
+                files[fileCount].file_name = strdup(entry->d_name);
+                files[fileCount].is_folder = false;
+            }
+
+            fileCount++; 
+        }
+    }
+
+    closedir(dir);   
+
+    if (fileCount > 0) {
+        ESP_LOGI(SD_TAG, "Retrieved %d files", fileCount);  
+    } else {
+        ESP_LOGW(SD_TAG, "No files found in directory: %s", directory); 
+    }
+
+    *out_files = files;
+
+    
+    return fileCount;
+
+}
+
+
+// uint16_t Get_Folder1(const char* directory, file_t **out_files)    
+// {
+//     DIR *dir = opendir(directory);  // Opens the specified directory
+//     if (dir == NULL) {
+//         ESP_LOGE(SD_TAG, "Path: <%s> does not exist", directory);  
+//         return 0; 
+//     }
+
+//     file_t *files = calloc(MAX_DIRECTORY_SIZE, sizeof(file_t)); // initialize an empty array to populate
+
+//     uint16_t fileCount = 0;  // File counter
+//     struct dirent *entry;    // Directory entry pointer
+
+//     // traverse through the directory
+//     while ((entry = readdir(dir)) != NULL && fileCount < MAX_DIRECTORY_SIZE) {
+//         // Skip "." and ".." Special directory
+//         if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+//             continue;
+//         }
+
+//         const char *dot = strrchr(entry->d_name, '.');  
+//         if (dot != NULL && dot != entry->d_name) {  
+
+//             if (strcasecmp(dot, fileExtension) == 0) { 
+//                 strncpy(File_Name[fileCount], entry->d_name, MAX_FILE_NAME_SIZE - 1);
+//                 File_Name[fileCount][MAX_FILE_NAME_SIZE - 1] = '\0'; 
+
+//                 char filePath[MAX_PATH_SIZE];
+//                 snprintf(filePath, MAX_PATH_SIZE, "%s/%s", directory, entry->d_name);
+
+//                 printf("File found: %s\r\n", filePath); 
+
+//                 // Add the file to the list
+//                 if(fileCount < MAX_DIRECTORY_SIZE){
+//                     files[fileCount].file_name = strdup(entry->d_name);
+//                     char filePath[MAX_PATH_SIZE];
+//                     snprintf(filePath, MAX_PATH_SIZE, "%s/%s", directory, entry->d_name);
+//                     files[fileCount].file_path = strdup(filePath);
+//                     // files[fileCount].extension = fileExtension;
+//                     files[fileCount].is_folder = false;
+//                 }
+                
+//                 fileCount++;  
+
+//             }
+//         }
+//         else{
+//             // If the extension name is not found, you can output debugging information
+//             // printf("No extension found for file: %s\r\n", entry->d_name);
+//         }
+//     }
+
+//     closedir(dir);  // 
+
+//     if (fileCount > 0) {
+//         ESP_LOGI(SD_TAG, "Retrieved %d files with extension '%s'", fileCount, fileExtension);  // 
+//     } else {
+//         ESP_LOGW(SD_TAG, "No files with extension '%s' found in directory: %s", fileExtension, directory);  // 
+//     }
+
+//     *out_files = files;
+
+//     return fileCount;  
+// }

@@ -6,11 +6,12 @@
 */
 
 #include "main.h"
+#include "Guitarbot.h"
 
 
 #define I2C_MASTER_SCL_IO   10 //9
 #define I2C_MASTER_SDA_IO   11 //8
-#define N_SERVOS            6
+// #define N_SERVOS            6
 
 
 static const char *MAIN_TAG = "Main";
@@ -56,10 +57,14 @@ void play_song_task(void * pvParameters)
 }
 
 
+SemaphoreHandle_t lvgl_mutex;
+
 void lvgl_task(void *arg)
 {
     while (1) {
+        xSemaphoreTake(lvgl_mutex, portMAX_DELAY);
         uint32_t delay_ms = lv_timer_handler();
+        xSemaphoreGive(lvgl_mutex);
         vTaskDelay(pdMS_TO_TICKS(delay_ms));
     }
 }
@@ -132,11 +137,21 @@ esp_err_t setup()
     }
 
     // Set to default angle (90 degrees)
-    vTaskDelay(pdMS_TO_TICKS(1000));
+    vTaskDelay(pdMS_TO_TICKS(500));
     // err = pca9685_set_pwm_test(&pca9685_dev, 0, 0, 307);
     for(int i = 0; i < N_SERVOS; i++){
         err = servo_set_angle(&servos[i], 90);
         vTaskDelay(pdMS_TO_TICKS(500));
+    }
+
+    // Setup the Guitarbot
+    guitar_fret_servo_t *fret_servos = NULL;
+    guitar_bridge_servo_t *bridge_servos = NULL;
+    err = guitarbot_init(servos, &fret_servos, &bridge_servos);
+    if(err != ESP_OK)
+    {
+        ESP_LOGE(MAIN_TAG, "Guitarbot initialization failed: %s", esp_err_to_name(err));
+        return err;
     }
 
     return ESP_OK;
@@ -149,11 +164,22 @@ esp_err_t setupUI()
     SD_Init();
     LCD_Init();
     LVGL_Init();   // returns the screen object
-    // xTaskCreate(lvgl_task, "lvgl_task", 8192, NULL, 5, NULL); // The task running lv_timer_handler should have lower priority than that running `lv_tick_inc`
-    xTaskCreatePinnedToCore(lvgl_task, "lvgl_task", 8192, NULL, 5, NULL, 1); // pin to core 1
-    ui_init(servos, sizeof(servos) / sizeof(servos[0])); // create the screen
+    // ui_init(servos, sizeof(servos) / sizeof(servos[0]));
+    ui_init(servos); // create the screen
+
+    lvgl_mutex = xSemaphoreCreateMutex(); // Ensures that only 1 task accesses the resources at a time
 
     return ESP_OK;
+}
+
+
+void setup_ui_task(void *arg)
+{
+    esp_err_t err = setupUI();
+    if(err != ESP_OK) ESP_LOGE(MAIN_TAG, "UI setup failed: %s", esp_err_to_name(err));
+
+    xTaskCreatePinnedToCore(lvgl_task, "lvgl_task", 8192, NULL, 5, NULL, 1); // pin to core 1
+    vTaskDelete(NULL);
 }
 
 
@@ -168,8 +194,9 @@ void app_main(void)
     if(err != ESP_OK) ESP_LOGE(MAIN_TAG, "Setup failed: %s", esp_err_to_name(err));
     
     
-    err = setupUI();
-    if(err != ESP_OK) ESP_LOGE(MAIN_TAG, "UI setup failed: %s", esp_err_to_name(err));
+    // err = setupUI();
+    xTaskCreatePinnedToCore(setup_ui_task, "setup_ui_task", 8192, NULL, 5, NULL, 1); // setup the UI - pin to core 1
+    // xTaskCreatePinnedToCore(lvgl_task, "lvgl_task", 8192, NULL, 5, NULL, 1); // create main UI task - pin to core 1
 
     
 

@@ -12,5 +12,5 @@
 
 // void Backlight_adjustment_event_cb(lv_event_t * e);
 
-void ui_init(servo_t servos[], int n_servos);
+void ui_init(servo_t servos[]);
 // void LVGL_Backlight_adjustment(uint8_t Backlight);

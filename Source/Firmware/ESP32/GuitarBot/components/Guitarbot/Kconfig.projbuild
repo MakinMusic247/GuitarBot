@@ -2,7 +2,7 @@ menu "GuitarBot Configuration"
     config GUITARBOT_NUM_SERVOS
         int "The number of servo motors to use"
         range 1 24
-        default 6
+        default 9
         help
             The number of servo motors connected to the ESP32 for use with the GuitarBot. 
             Guitarbot supports multiple PCA9685 servo driver boards that can support up to 12 servo motor channels each

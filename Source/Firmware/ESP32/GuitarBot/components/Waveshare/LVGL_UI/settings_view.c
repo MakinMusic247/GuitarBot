@@ -13,6 +13,7 @@ static lv_style_t style_bullet;
 // Struct that updates and tracks the servo position and displays on UI
 typedef struct {
     servo_t *servo;
+    lv_obj_t *view; // main view
     lv_obj_t *angle_label;
     lv_obj_t *meter;
     lv_meter_indicator_t *indicator;
@@ -24,9 +25,10 @@ static void arc_value_changed_event_cb(lv_event_t * e);
 static void lv_servo_arc(lv_obj_t * parent);
 void servo_create_setting(servo_t *servo, uint8_t servo_num);
 static lv_obj_t * create_servo_view(lv_obj_t * parent, servo_t *servo, servo_settings_t *settings, uint8_t servo_num);
+void show_servo_view(servo_settings_t *settings, uint8_t servo_num);
 lv_obj_t * lv_create_pages(lv_obj_t * parent);
 
-static const char * btnm_map[] = { "-", "+", "\n", "reset", "" };
+static const char * btnm_map[] = { "-", "|", "+", "" }; //{ "-", "+", "\n", "reset", "" };
 
 static servo_t *servos_arr = NULL; // holds the servos 
 static int servo_count = 0;
@@ -53,7 +55,10 @@ static void update_servo(servo_settings_t *settings, float new_angle)
     ESP_LOGI("Settings UI", "Setting servo angle");
     servo_set_angle(settings->servo, new_angle);
     set_indicator_value(settings->indicator, (int32_t)new_angle, settings->meter);
-    lv_label_set_text(settings->angle_label, "%f deg");
+    // lv_label_set_text(settings->angle_label, "%f deg");
+    static char angle_label_buffer[16];
+    snprintf(angle_label_buffer, sizeof(angle_label_buffer), "%d deg", (int16_t)new_angle);
+    lv_label_set_text_static(settings->angle_label, angle_label_buffer);
 }
 
 
@@ -76,15 +81,15 @@ static void btn_matrix_event_handler(lv_event_t * e)
 
         // LV_LOG_USER("%s was pressed\n", txt);
         ESP_LOGI("Settings UI", "%s was pressed (id %u)\n", txt, id);
-        if(id == 0){
+        if(id == 0){ // minus
             ESP_LOGI("Settings UI", "decrease angle");
             new_angle = current_angle - 5;
         }
-        else if(id == 1){
+        else if(id == 2){ // plus
             ESP_LOGI("Settings UI", "increase angle");
             new_angle = current_angle + 5;
         }
-        else if(id == 2){
+        else if(id == 1){ // reset
             ESP_LOGI("Settings UI", "reset to default");
             new_angle = 90.0;
         }
@@ -115,6 +120,7 @@ lv_obj_t *_lv_settings_view_create(lv_obj_t * parent, servo_t servos[])
     // Set a flex flow to add new items horizontally
     lv_obj_set_flex_flow(panel1, LV_FLEX_FLOW_COLUMN); // LV_FLEX_FLOW_ROW
     lv_obj_set_style_pad_row(panel1, 4, 0);
+    lv_obj_set_flex_align(panel1, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     
 
     servos_arr = servos;
@@ -125,12 +131,12 @@ lv_obj_t *_lv_settings_view_create(lv_obj_t * parent, servo_t servos[])
 
         // Initialize the servo settings
         for(int i=0; i<N_SERVOS; i++){
-            servo_create_setting(&servos[i], i); 
+            servo_create_setting(&servos[i], i);
+            lv_obj_t * servo_view = create_servo_view(panel1, &servos[i], &servo_settings[i], i); 
         }
 
-        // Create the first page
-        lv_obj_t * servo_view = create_servo_view(panel1, &servos[0], &servo_settings[0], 0);
-        curr_servo = servo_view;
+        // Show the first page
+        show_servo_view(&servo_settings[0], 0);
 
         // Create the page controls
         lv_obj_t * page_buttons = lv_create_pages(panel1);
@@ -173,24 +179,28 @@ lv_obj_t * create_servo_view(lv_obj_t * parent, servo_t *servo, servo_settings_t
     }
 
     // Delete existing screen
-    if(curr_servo) lv_obj_del(curr_servo);
+    if(settings->view) lv_obj_del(settings->view);
 
     lv_obj_t *card = lv_obj_create(parent);
     lv_obj_set_width(card, LV_SIZE_CONTENT);
-    lv_obj_set_height(card, lv_pct(100)); //LV_SIZE_CONTENT);
+    lv_obj_set_height(card, lv_pct(90)); //LV_SIZE_CONTENT);
     lv_obj_set_flex_flow(card, LV_FLEX_FLOW_COLUMN);
+    lv_obj_set_flex_align(card, LV_FLEX_ALIGN_START, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_all(card, 6, 0);
     lv_obj_set_style_pad_row(card, 2, 0);
+
+    lv_obj_add_flag(card, LV_OBJ_FLAG_HIDDEN); // initially make view invisible
 
     lv_obj_t *name_label = lv_label_create(card);
     lv_label_set_text_fmt(name_label, "Servo %u", servo_num);
     // lv_label_set_text(name_label, "Servo");
-    lv_obj_set_size(name_label, 80, 10);
+    lv_obj_set_size(name_label, 100, 10);
+    lv_obj_set_style_text_align(name_label, LV_TEXT_ALIGN_CENTER, 0);
 
 
     /* Angle indicator */
     lv_obj_t * meter = lv_meter_create(card);
-    lv_obj_set_size(meter, 80, 80);
+    lv_obj_set_size(meter, 100, 100);
     lv_meter_scale_t * scale = lv_meter_add_scale(meter);
     lv_meter_set_scale_range(meter, scale, 0, 180, 180, 180);
     lv_meter_set_scale_ticks(meter, scale, 9, 2, 8, lv_palette_main(LV_PALETTE_GREY));
@@ -204,7 +214,10 @@ lv_obj_t * create_servo_view(lv_obj_t * parent, servo_t *servo, servo_settings_t
 
     // label for tracking angle value
     settings->angle_label = lv_label_create(card);
-    lv_label_set_text_fmt(settings->angle_label, "%d deg", 90);
+    // lv_label_set_text_fmt(settings->angle_label, "%d deg", 90);
+    static char angle_label_buffer[16];
+    snprintf(angle_label_buffer, sizeof(angle_label_buffer), "%d deg", 90);
+    lv_label_set_text_static(settings->angle_label, angle_label_buffer);
 
     settings->indicator = indic;
     settings->meter = meter;
@@ -213,17 +226,32 @@ lv_obj_t * create_servo_view(lv_obj_t * parent, servo_t *servo, servo_settings_t
     /* angle control buttons */
     lv_obj_t * btnm1 = lv_btnmatrix_create(card);
     lv_btnmatrix_set_map(btnm1, btnm_map);
-    lv_obj_set_size(btnm1, 80, 80);
-    lv_btnmatrix_set_btn_width(btnm1, 0, 1);
-    lv_btnmatrix_set_btn_width(btnm1, 1, 1);
-    lv_btnmatrix_set_btn_width(btnm1, 2, 2);
-    lv_obj_set_style_pad_row(btnm1, 6, LV_PART_MAIN);
-    lv_obj_set_style_pad_column(btnm1, 6, LV_PART_MAIN);
+    lv_obj_set_size(btnm1, 100, 50);
+    lv_btnmatrix_set_btn_width(btnm1, 0, 1); // -
+    lv_btnmatrix_set_btn_width(btnm1, 1, 1); // reset
+    lv_btnmatrix_set_btn_width(btnm1, 2, 1); // +
+    // lv_obj_set_style_pad_row(btnm1, 6, LV_PART_MAIN);
+    // lv_obj_set_style_pad_column(btnm1, 6, LV_PART_MAIN);
     lv_obj_add_event_cb(btnm1, btn_matrix_event_handler, LV_EVENT_ALL, settings); // Add the settings to the *user_data param - lets us track which servo is updated
 
     curr_servo = card;
+
+    settings->view = card; // store the main view
     return card;
 }
+
+
+/// @brief Display the selected servo
+/// @param settings 
+/// @param servo_num 
+/// @return 
+void show_servo_view(servo_settings_t *settings, uint8_t servo_num)
+{
+    lv_obj_add_flag(curr_servo, LV_OBJ_FLAG_HIDDEN); // remove current servo from screen
+    lv_obj_clear_flag(settings->view, LV_OBJ_FLAG_HIDDEN); // remove the hidden flag for the new servo UI
+    curr_servo = settings->view; // set the current servo as the view
+}
+
 
 
 static void arc_value_changed_event_cb(lv_event_t * e)
@@ -251,13 +279,18 @@ static void page_changed_cb(lv_event_t * e)
 {
     lv_obj_t * obj = lv_event_get_target(e);
     uint32_t id = lv_btnmatrix_get_selected_btn(obj);
-    bool prev = id == 0 ? true : false;
-    bool next = id == N_SERVOS + 1 ? true : false;
+    bool prev = (id == 0); // id == 0 ? true : false;
+    bool next = (id == N_SERVOS + 1); // ? true : false;
 
-    int servo_num = id - 1; // get the servo number
-    ESP_LOGI("Settings UI", "Page changed (page id=%u) (servo id=%u)", id, servo_num);
-
-    create_servo_view(panel1, &servos_arr[servo_num], &servo_settings[servo_num], servo_num);
+    if(!next && !prev){
+        int servo_num = id - 1; // get the servo number
+        ESP_LOGI("Settings UI", "Page changed (page id=%u) (servo id=%u)", id, servo_num);
+        if(servo_num >= 0 && servo_num < N_SERVOS){
+            show_servo_view(&servo_settings[servo_num], servo_num);
+            lv_btnmatrix_set_btn_ctrl(obj, id, LV_BTNMATRIX_CTRL_CHECKED);
+        }
+    }
+    
 
     if(prev || next) {
         /*Find the checked button*/
@@ -270,6 +303,11 @@ static void page_changed_cb(lv_event_t * e)
         else if(next && i < N_SERVOS) i++;
 
         lv_btnmatrix_set_btn_ctrl(obj, i, LV_BTNMATRIX_CTRL_CHECKED);
+
+        int servo_num = id - 1;
+        if(servo_num >= 0 && servo_num < N_SERVOS){
+            show_servo_view(&servo_settings[servo_num], servo_num);
+        }
     }
 }
 
@@ -311,7 +349,7 @@ lv_obj_t * lv_create_pages(lv_obj_t * parent)
     lv_obj_add_style(btnm, &style_bg, 0);
     lv_obj_add_style(btnm, &style_btn, LV_PART_ITEMS);
     lv_obj_add_event_cb(btnm, page_changed_cb, LV_EVENT_VALUE_CHANGED, NULL);
-    lv_obj_set_size(btnm, 225, 35);
+    lv_obj_set_size(btnm, lv_pct(100), lv_pct(10)); //225, 35);
 
     /*Allow selecting on one number at time*/
     lv_btnmatrix_set_btn_ctrl_all(btnm, LV_BTNMATRIX_CTRL_CHECKABLE);

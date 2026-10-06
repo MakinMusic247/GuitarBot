@@ -27,7 +27,6 @@ bool setup_complete()
 }
 
 
-
 /// @brief Search for a servo given the string and fret
 ///        Servos are grouped into groups of 3 per fret (1st fret: servos 0,1,2, 2nd fret: servos 3,4,5 ...)
 ///        Use integer arithmetic with the fret to find the servo array index. Then use the string to find the servo horn direction (top or bottom)
@@ -36,10 +35,13 @@ bool setup_complete()
 /// @return 
 static esp_err_t lookup_servo(uint8_t string, uint8_t fret, guitar_fret_servo_t *out_fret_servo, guitar_bridge_servo_t *out_bridge_servo)
 {
-    // if(servos_arr = NULL || fret_servos = NULL || bridge_servos = NULL){
-    //     ESP_LOGE(GB_TAG, "No servos");
-    //     return ESP_ERR_INVALID_ARG;
-    // }
+    memset(out_fret_servo, 0, sizeof(*out_fret_servo));
+    memset(out_bridge_servo, 0, sizeof(*out_bridge_servo));
+
+    if (string >= 6) {
+        ESP_LOGE(GB_TAG, "Invalid string %u", string);
+        return ESP_ERR_NOT_FOUND;
+    }
 
     /* Servos are grouped into group of 3 per fret */ 
     // To get the first servo of each fret:
@@ -48,46 +50,84 @@ static esp_err_t lookup_servo(uint8_t string, uint8_t fret, guitar_fret_servo_t 
     // To get the correct string:
     // E.g. fret 1, string[2] (D) --> servo idx = fret_idx + string/2 = 0 + 2/2 = servos[1]
     // E.g. fret 2, string[5] (e) --> servo idx = 3 + 5/2 = servos[6]
-    int fret_idx = (fret - 1) * 3 + string/2; // Get the array index from the fret ( fret = idx / 3 + 1 --> (idx + 1) * 3 )
-    ESP_LOGI(GB_TAG, "fret: %d, string: %d = servo[%d]", fret, string, fret_idx);
+    if(fret > 0){
+        int fret_idx = (fret - 1) * 3 + string/2; // Get the array index from the fret ( fret = idx / 3 + 1 --> (idx + 1) * 3 )
+        ESP_LOGI(GB_TAG, "fret: %d, string: %d = servo[%d]", fret, string, fret_idx);
     
-    // check valid
-    if(fret_idx >= N_SERVOS){
-        ESP_LOGE(GB_TAG, "Invalid servo index");
-        return ESP_ERR_NOT_FOUND;
-    }
+        // check valid
+        if(fret_idx >= N_FRET_SERVOS){
+            ESP_LOGE(GB_TAG, "Invalid servo index");
+            return ESP_ERR_NOT_FOUND;
+        }
 
-    // Return the servos
-    *out_fret_servo = fret_servos[fret_idx];
+        *out_fret_servo = fret_servos[fret_idx];
+    }
     
     /* String index */
-    // Only need to handle 6 strings
-    if(string == 0 || string == 1){
-        *out_bridge_servo = bridge_servos[0];
-    } else if(string == 2 || string == 3){
-        *out_bridge_servo = bridge_servos[1];
-    } else if(string == 4 || string == 5){
-        *out_bridge_servo = bridge_servos[2];
-    }
-    else{
-        ESP_LOGE(GB_TAG, "Invalid servo index");
-        return ESP_ERR_NOT_FOUND;
-    }
+    *out_bridge_servo = bridge_servos[string/2];
     
     return ESP_OK;
 }
 
 
 
+/// @brief play a note given a string and fret
+/// If fret is 0 --> play an open string
+/// TODO: handle using 6 bridge servos
+/// @param string 
+/// @param fret 
+/// @return 
 esp_err_t play_note(uint8_t string, uint8_t fret)
 {
     ESP_LOGI(GB_TAG, "Playing note\nstring %u, fret %u", string, fret);
 
     // Find matching servo
+    guitar_fret_servo_t fret_servo = {0};
+    guitar_bridge_servo_t bridge_servo = {0};
+    esp_err_t err = lookup_servo(string, fret, &fret_servo, &bridge_servo);
+    if (err != ESP_OK) {
+        return err;
+    }
+
+    if(!bridge_servo.servo){
+        ESP_LOGI(GB_TAG, "Servo not found for fret %u string %u", fret, string);
+        return ESP_ERR_NOT_FOUND;
+    }
+    if(fret > 0 && !bridge_servo.servo){
+        ESP_LOGI(GB_TAG, "Servo not found for fret %u string %u", fret, string);
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    // Get the angle  
+    float fret_angle = SERVO_ANGLE_DEFAULT;
+    float bridge_angle = SERVO_ANGLE_DEFAULT;
+    if(string % 2 == 0){ // even strings (0,2,4) = (E,D,B)
+        fret_angle = SERVO_ANGLE_TOP;
+        // Check the current angle 
+        bridge_angle = bridge_servo.servo->current_angle == BRIDGE_SERVO_ANGLE_TOP ? SERVO_ANGLE_DEFAULT : BRIDGE_SERVO_ANGLE_TOP;
+        // bridge_angle = BRIDGE_SERVO_ANGLE_TOP;
+    }
+    else{
+        fret_angle = SERVO_ANGLE_BOTTOM;
+        bridge_angle = bridge_servo.servo->current_angle == BRIDGE_SERVO_ANGLE_BOTTOM ? SERVO_ANGLE_DEFAULT : BRIDGE_SERVO_ANGLE_BOTTOM;
+        // bridge_angle = BRIDGE_SERVO_ANGLE_BOTTOM;
+    }
+
+    // Check current angle - if already top/bottom - reset to default
+    if(fret > 0){
+        // TODO: reset string only if needed
+        reset_string(string, fret); // reset frets on same string that block the target fret
+        err = servo_set_angle(fret_servo.servo, fret_angle); // fret in default
+        vTaskDelay(pdMS_TO_TICKS(200)); // slight delay to let servo hit fret
+    }
+    else{
+        reset_string(string, 1); // reset all frets on same string
+    }
+    err = servo_set_angle(bridge_servo.servo, bridge_angle); // bridge to top
+    vTaskDelay(pdMS_TO_TICKS(200));
+
 
     // If no servo exists - try to find closest corresponding note
-    // If two consecutive strings (E-A, D-G, B-e) of same fret are requested - select the preferred string
-
 
     return ESP_OK;
 
@@ -127,6 +167,50 @@ esp_err_t play_beat(beat_t *beat)
 
     return ESP_OK;
 
+}
+
+
+/// @brief Reset all of the frets on a given string
+/// @param string the string to reset 
+/// @param fret starting index to reset all frets (e.g. if 0 --> reset all, if 2 --> reset all frets 2 and above)
+/// TODO: get logic working
+/// @return 
+esp_err_t reset_string(uint8_t string, uint8_t fret_offset){
+    esp_err_t err;
+
+    if(string > 5){
+        ESP_LOGE(GB_TAG, "Invalid string: %u", string);
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    ESP_LOGI(GB_TAG, "Resetting string %s", STRING_NAMES[string]);
+
+    guitar_fret_servo_t fret_servo = {0};
+    // guitar_bridge_servo_t bridge_servo = {0};
+
+    uint8_t n_frets = get_fret_count();
+    if(fret_offset > n_frets) return ESP_ERR_INVALID_ARG; // ensure target fret in bounds
+    if(fret_offset <= 0) fret_offset = 1;
+
+    for(uint8_t f=fret_offset; f<n_frets+1; f++){
+        int fret_idx = (f - 1) * 3 + string/2; // Get the array index from the fret ( fret = idx / 3 + 1 --> (idx + 1) * 3 )
+        ESP_LOGI(GB_TAG, "fret: %d, string: %d = servo[%d]", f, string, fret_idx);
+
+        // check valid
+        if(fret_idx >= N_FRET_SERVOS && fret_idx < 0){
+            ESP_LOGE(GB_TAG, "Invalid servo index");
+            return ESP_ERR_NOT_FOUND;
+        }
+
+        fret_servo = fret_servos[fret_idx];
+        if(fret_servo.servo){
+            err = servo_set_angle(fret_servo.servo, SERVO_ANGLE_DEFAULT); // fret in default
+            vTaskDelay(pdMS_TO_TICKS(20)); // slight delay to let servo hit fret
+        }
+    }
+
+    return ESP_OK;
+    
 }
 
 
@@ -341,3 +425,14 @@ esp_err_t guitarbot_init(servo_t servos[], guitar_fret_servo_t **out_fret_servos
 
 }
 
+
+
+/*********************************************************************************/
+// helper functions
+
+/// @brief Get the number of frets
+/// @return 
+uint8_t get_fret_count()
+{
+    return N_FRET_SERVOS / 3;
+}

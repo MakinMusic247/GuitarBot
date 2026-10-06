@@ -19,7 +19,7 @@
 
 // Total number of servos being used
 #ifndef CONFIG_GUITARBOT_NUM_SERVOS
-    #define CONFIG_GUITARBOT_NUM_SERVOS 6 
+    #define CONFIG_GUITARBOT_NUM_SERVOS 9 
 #endif
 // How many of the servos (first n channels) are for the open strings
 #ifndef CONFIG_GUITARBOT_NUM_BRIDGE_SERVOS
@@ -39,7 +39,7 @@
 
 #define N_SERVOS        CONFIG_GUITARBOT_NUM_SERVOS
 #define N_BRIDGE_SERVOS CONFIG_GUITARBOT_NUM_BRIDGE_SERVOS
-#define N_FRET_SERVOS   N_SERVOS -  N_BRIDGE_SERVOS
+#define N_FRET_SERVOS   (N_SERVOS -  N_BRIDGE_SERVOS)
 
 /* Servo angles */
 #define SERVO_ANGLE_DEFAULT     CONFIG_SERVO_ANGLE_DEFAULT
@@ -88,6 +88,9 @@ typedef struct {
 } beat_t;
 
 
+static const char *STRING_NAMES[6] = {"E", "A", "D", "G", "B", "e"};
+
+
 
 /// @brief Play a note on the guitar given a string and fret
 /// @param string 
@@ -96,12 +99,13 @@ typedef struct {
 esp_err_t play_note(uint8_t string, uint8_t fret);
 
 esp_err_t guitarbot_init(servo_t servos[], guitar_fret_servo_t **out_fret_servos, guitar_bridge_servo_t **out_bridge_servos);
-
 esp_err_t test_play();
+
+esp_err_t reset_string(uint8_t string, uint8_t fret);
 
 bool tab_playing();
 bool setup_complete();
-
+uint8_t get_fret_count();
 
 
 #endif

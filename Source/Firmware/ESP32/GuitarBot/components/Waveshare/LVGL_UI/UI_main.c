@@ -107,8 +107,6 @@ static void Tabviewer_create(lv_obj_t * parent, servo_t servos[])
     lv_obj_set_style_bg_color(parent, lv_color_hex(0x343247), 0);
     
     _lv_tablature_view_create(parent);
-    // _lv_settings_page_create(parent, servos);
-  
 }
 
 
@@ -119,7 +117,8 @@ static void Settings_create(lv_obj_t * parent, servo_t servos[])
   original_screen_bg_color = lv_obj_get_style_bg_color(parent, 0);
   lv_obj_set_style_bg_color(parent, lv_color_hex(0x343247), 0);
 
-  _lv_settings_view_create(parent, servos);
+  // _lv_settings_view_create(parent, servos);
+  _lv_settings_page_create(parent, servos);
 }
 
 

@@ -1,12 +1,13 @@
 #include "SD_MMC.h"
 
-#define EXAMPLE_MAX_CHAR_SIZE    64
+#define EXAMPLE_MAX_CHAR_SIZE    2048
 #define MOUNT_POINT "/sdcard"
 
 static const char *SD_TAG = "SD";
 
 uint32_t Flash_Size = 0;
 uint32_t SDCard_Size = 0;
+char file_buffer[MAX_FILE_SIZE];
 
 
 esp_err_t s_example_write_file(const char *path, char *data)
@@ -42,6 +43,36 @@ esp_err_t s_example_read_file(const char *path)
         *pos = '\0';
     }
     ESP_LOGI(SD_TAG, "Read from file: '%s'", line);
+
+    return ESP_OK;
+}
+
+
+esp_err_t sd_read_file(const char *path)
+{
+    ESP_LOGI(SD_TAG, "Reading file %s", path);
+    FILE *f = fopen(path, "r");
+    if (f == NULL) {
+        ESP_LOGE(SD_TAG, "Failed to open file for reading");
+        return ESP_FAIL;
+    }
+    
+    // Find the length of the file
+    fseek(f, 0, SEEK_END);
+    long fsize = ftell(f);
+    fseek(f, 0, SEEK_SET);
+
+    if(fsize > MAX_FILE_SIZE){
+        ESP_LOGE(SD_TAG, "File too large");
+        return ESP_ERR_INVALID_SIZE;
+    }
+
+    // char *buffer = malloc(fsize + 1);
+    fread(file_buffer, 1, fsize, f);
+    file_buffer[fsize] = '\0'; // Null-terminate
+    fclose(f);
+
+    ESP_LOGI(SD_TAG, "Read from file: '%s'", file_buffer);
 
     return ESP_OK;
 }
@@ -228,9 +259,11 @@ uint16_t Get_Folder(const char* directory, file_t **out_files)
         if(stat(full_path, &entry_stat) == 0) {
             if(S_ISDIR(entry_stat.st_mode)) { // is directory?
                 files[fileCount].file_name = strdup(entry->d_name);
+                files[fileCount].file_path = strdup(full_path);
                 files[fileCount].is_folder = true;
             } else{
                 files[fileCount].file_name = strdup(entry->d_name);
+                files[fileCount].file_path = strdup(full_path);
                 files[fileCount].is_folder = false;
             }
 

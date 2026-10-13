@@ -15,6 +15,9 @@
 #include <inttypes.h>
 #include "servo.h"
 #include "sdkconfig.h"
+#include "json_parser.h"
+#include "SD_Card/SD_MMC.h"
+#include "utils.h"
 
 
 // Total number of servos being used
@@ -98,7 +101,18 @@ static const char *STRING_NAMES[6] = {"E", "A", "D", "G", "B", "e"};
 /// @return 
 esp_err_t play_note(uint8_t string, uint8_t fret);
 
+/// @brief Initialize the GuitarBot, assigning servo motors to guitar strings and frets
+/// @param servos 
+/// @param out_fret_servos 
+/// @param out_bridge_servos 
+/// @return 
 esp_err_t guitarbot_init(servo_t servos[], guitar_fret_servo_t **out_fret_servos, guitar_bridge_servo_t **out_bridge_servos);
+
+/// @brief Read a guitar tab from the SD card
+/// @param file_path 
+/// @return 
+esp_err_t read_tab(const char *file_path);
+
 esp_err_t test_play();
 
 esp_err_t reset_string(uint8_t string, uint8_t fret);
@@ -106,6 +120,7 @@ esp_err_t reset_string(uint8_t string, uint8_t fret);
 bool tab_playing();
 bool setup_complete();
 uint8_t get_fret_count();
+
 
 
 #endif

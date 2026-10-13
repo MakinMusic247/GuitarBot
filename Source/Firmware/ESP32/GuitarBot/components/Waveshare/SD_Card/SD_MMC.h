@@ -26,6 +26,7 @@
 #define MAX_FILE_NAME_SIZE      100  // Define maximum file name size
 #define MAX_PATH_SIZE           512  // Define a larger size for the full path
 #define MAX_DIRECTORY_SIZE      20   // maximum number of files in a directory to read
+#define MAX_FILE_SIZE           4096
 
 typedef struct {
     char* file_name;
@@ -35,11 +36,15 @@ typedef struct {
 } file_t;
 
 
+extern char file_buffer[MAX_FILE_SIZE];
+
+
 esp_err_t SD_Card_CS_EN(void);
 esp_err_t SD_Card_CS_Dis(void);
 
 esp_err_t s_example_write_file(const char *path, char *data);
 esp_err_t s_example_read_file(const char *path);
+esp_err_t sd_read_file(const char *path);
 
 extern uint32_t SDCard_Size;
 extern uint32_t Flash_Size;

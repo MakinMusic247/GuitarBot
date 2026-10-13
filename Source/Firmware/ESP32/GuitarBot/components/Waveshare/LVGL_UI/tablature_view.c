@@ -9,7 +9,13 @@ lv_obj_t * tab_panel = NULL; // Overall panel of page
 file_t *files = NULL;
 uint16_t file_count = 0;
 
+lv_obj_t * cont;
+lv_obj_t * label;
+lv_obj_t * tab_label;
+lv_obj_t * button;
+
 lv_obj_t * lv_create_button(lv_obj_t * parent);
+static void file_clicked_event_handler(lv_event_t * e);
 
 
 /// @brief Get the files from the SD card
@@ -36,30 +42,17 @@ lv_obj_t *_lv_tablature_view_create(lv_obj_t * parent)
     lv_obj_set_size(menu, lv_pct(100), lv_pct(100));
     lv_obj_center(menu);
 
-    lv_obj_t * cont;
-    lv_obj_t * label;
-    lv_obj_t * button;
-
-
     /*Create a sub page*/
     lv_obj_t * sub_page = lv_menu_page_create(menu, NULL);
 
     cont = lv_menu_cont_create(sub_page);
     button = lv_create_button(sub_page); // Create a play pause button
-    // label = lv_label_create(cont);
-    // lv_label_set_text(label, "Hello, I am hiding here");
+    tab_label = lv_label_create(sub_page);
+    lv_label_set_text(tab_label, "loading...");
 
 
     /*Create a main page*/
     lv_obj_t * main_page = lv_menu_page_create(menu, NULL);
-
-    // cont = lv_menu_cont_create(main_page);
-    // label = lv_label_create(cont);
-    // lv_label_set_text(label, "Item 1");
-
-    // cont = lv_menu_cont_create(main_page);
-    // label = lv_label_create(cont);
-    // lv_label_set_text(label, "Item 2");
 
     file_count = get_files(); // Get files from SD card
     if(file_count > 0)
@@ -70,6 +63,7 @@ lv_obj_t *_lv_tablature_view_create(lv_obj_t * parent)
             label = lv_label_create(cont);
             lv_label_set_text(label, files[i].file_name);
             lv_menu_set_load_page_event(menu, cont, sub_page);
+            lv_obj_add_event_cb(cont, file_clicked_event_handler, LV_EVENT_CLICKED, &files[i]); // Add a callback with the file as data
         }
     }else{
         // No files found
@@ -79,18 +73,28 @@ lv_obj_t *_lv_tablature_view_create(lv_obj_t * parent)
         lv_menu_set_load_page_event(menu, cont, sub_page);
     }
 
-    // cont = lv_menu_cont_create(main_page);
-    // label = lv_label_create(cont);
-    // lv_label_set_text(label, "Test tab");
-    // lv_menu_set_load_page_event(menu, cont, sub_page);
-
     lv_menu_set_page(menu, main_page);
 
     return menu;
 }
 
 
-static void event_handler(lv_event_t * e)
+static void file_clicked_event_handler(lv_event_t * e)
+{
+    ESP_LOGI(TAB_UI_TAG, "Sd card file clicked"); 
+    file_t *file = (file_t *)lv_event_get_user_data(e); // Get the user data (pointer to the file that was clicked)
+    if(!file){
+        ESP_LOGE(TAB_UI_TAG, "Error: file not found"); 
+    }
+    ESP_LOGI(TAB_UI_TAG, "Opening %s", file->file_path);
+
+    read_tab(file->file_path);
+    lv_label_set_text(tab_label, "Opened");
+    
+}
+
+
+static void btn_play_event_handler(lv_event_t * e)
 {
     lv_event_code_t code = lv_event_get_code(e);
 
@@ -113,7 +117,7 @@ lv_obj_t * lv_create_button(lv_obj_t * parent)
     lv_obj_t * label;
 
     lv_obj_t * btn = lv_btn_create(parent);
-    lv_obj_add_event_cb(btn, event_handler, LV_EVENT_ALL, NULL);
+    lv_obj_add_event_cb(btn, btn_play_event_handler, LV_EVENT_ALL, NULL);
     lv_obj_align(btn, LV_ALIGN_CENTER, 0, 40);
     lv_obj_add_flag(btn, LV_OBJ_FLAG_CHECKABLE);
     lv_obj_set_height(btn, LV_SIZE_CONTENT);

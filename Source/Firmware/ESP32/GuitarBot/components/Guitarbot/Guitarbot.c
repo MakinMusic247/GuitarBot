@@ -260,57 +260,6 @@ esp_err_t test_play()
 
     }
 
-    // err = servo_set_angle(fret_servos[0].servo, SERVO_ANGLE_DEFAULT); // fret in default
-    // vTaskDelay(pdMS_TO_TICKS(200));
-    // err = servo_set_angle(bridge_servos[0].servo, BRIDGE_SERVO_ANGLE_TOP); // bridge to top
-    // vTaskDelay(pdMS_TO_TICKS(2000));
-
-    // err = servo_set_angle(fret_servos[0].servo, SERVO_ANGLE_TOP); // fret to top
-    // vTaskDelay(pdMS_TO_TICKS(200));
-    // err = servo_set_angle(bridge_servos[0].servo, SERVO_ANGLE_DEFAULT); // bridge return to center
-    // vTaskDelay(pdMS_TO_TICKS(2000));
-
-    // err = servo_set_angle(fret_servos[1].servo, SERVO_ANGLE_DEFAULT);
-    // vTaskDelay(pdMS_TO_TICKS(200));
-    // err = servo_set_angle(bridge_servos[1].servo, BRIDGE_SERVO_ANGLE_TOP);
-    // vTaskDelay(pdMS_TO_TICKS(2000));
-
-    // err = servo_set_angle(fret_servos[1].servo, SERVO_ANGLE_TOP);
-    // vTaskDelay(pdMS_TO_TICKS(200));
-    // err = servo_set_angle(bridge_servos[1].servo, SERVO_ANGLE_DEFAULT);
-    // vTaskDelay(pdMS_TO_TICKS(2000));
-
-    
-
-    /* measure 1 */
-
-    // // beat 1 - open E
-    // vTaskDelay(pdMS_TO_TICKS(500));
-    // err = servo_set_angle(bridge_servos[0].servo, BRIDGE_SERVO_ANGLE_TOP);
-
-    // // beat 2 - E fret 1
-    // vTaskDelay(pdMS_TO_TICKS(500));
-    // err = servo_set_angle(fret_servos[0].servo, SERVO_ANGLE_TOP);
-    // vTaskDelay(pdMS_TO_TICKS(10));
-    // err = servo_set_angle(bridge_servos[0].servo, BRIDGE_SERVO_ANGLE_BOTTOM);
-    // vTaskDelay(pdMS_TO_TICKS(10));
-    // err = servo_set_angle(fret_servos[0].servo, SERVO_ANGLE_DEFAULT); // reset
-
-    // beat 3 - open A
-
-    // beat 4 - A fret 1
-
-    /* measure 2 */
-
-    // beat 5 - open D;
-
-    // beat 6 - D fret 1
-
-    // beat 7 - open G 
-
-    // beat 8 - G fret 1
-
-
     // Set servos to default
     for(int i = 0; i < N_BRIDGE_SERVOS; i++){
         
@@ -328,6 +277,32 @@ esp_err_t test_play()
 
     return ESP_OK;
 
+}
+
+
+esp_err_t read_tab(const char *file_path)
+{
+    ESP_LOGI(GB_TAG, "Reading guitar tab: %s", file_path);
+    esp_err_t err;
+    
+    // Read the SD card file
+    // FILE* tab_file = Open_File(file_path);
+    // err = s_example_read_file(file_path);
+    err = sd_read_file(file_path);
+    if(err != ESP_OK){
+        ESP_LOGE(GB_TAG, "Error reading guitar tab: %s", esp_err_to_name(err));
+    }
+
+    // parse the file content as json
+    jparse_ctx_t jctx;
+    err = parse_json(&jctx, file_buffer);
+    if(err != ESP_OK){
+        ESP_LOGE(GB_TAG, "Error parsing guitar tab json: %s", esp_err_to_name(err));
+    }
+    
+    
+
+    return ESP_OK;
 }
 
 

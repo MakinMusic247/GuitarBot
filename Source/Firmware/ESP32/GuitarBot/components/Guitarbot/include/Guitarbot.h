@@ -53,6 +53,8 @@
 #define BRIDGE_SERVO_ANGLE_TOP         75
 #define BRIDGE_SERVO_ANGLE_BOTTOM      105
 
+#define STRING_FRET_VALUE_NULL          255 // If string or fret is set to 255 (max value of uint8_t), consider it NULL
+
 
 typedef enum { ARM_TOP = 0, ARM_BOTTOM = 1 } servo_direction_t;
 
@@ -79,6 +81,7 @@ typedef struct {
 
 
 /// @brief A music note containing
+// Use value of 255 to denote no values
 typedef struct {
     uint8_t string; // 0-5 (EADGBe)
     uint8_t fret;   // Fret (0 = open string, 1 = fret 1, ...)
@@ -89,6 +92,14 @@ typedef struct {
     note_t *notes;  // An array of notes
     size_t n_notes; // number of notes in this beat
 } beat_t;
+
+
+typedef struct {
+    char name[64];      // song name
+    uint16_t tempo;     // tempo of the song
+    size_t n_beats;     // number of beats in the song
+    beat_t beats[];     // An array of beats
+} guitar_tab_t;
 
 
 static const char *STRING_NAMES[6] = {"E", "A", "D", "G", "B", "e"};
@@ -120,6 +131,7 @@ esp_err_t reset_string(uint8_t string, uint8_t fret);
 bool tab_playing();
 bool setup_complete();
 uint8_t get_fret_count();
+esp_err_t reset_tab();
 
 
 

@@ -28,7 +28,7 @@
  *  each array of length 6 corresponds to the strings {E,A,D,G,B,E} and the fret to be played
  *  -1 => no note played on string, 0 => open string, 1 => fret 1 of string, ...
 */
-int tab[][6] = { // each array of size 6
+int test_tab[][6] = { // each array of size 6
                 {-1, -1, -1, -1, -1, -1},  // beat 1
                 { 0, -1, -1, -1, -1, -1},  // beat 2
                 {-1,  0, -1, -1, -1, -1},  // beat 3...

@@ -4,12 +4,26 @@
 
 static const char *GB_TAG = "GB";
 
-// static servo_t servos_arr[N_SERVOS]; // holds the servos
-// static guitar_fret_servo_t fret_servos[N_FRET_SERVOS];
-// static guitar_bridge_servo_t bridge_servos[N_BRIDGE_SERVOS];
 static servo_t *servos_arr = NULL;
 static guitar_fret_servo_t *fret_servos = NULL;
 static guitar_bridge_servo_t *bridge_servos = NULL;
+
+guitar_tab_t *tab; // the current guitar tab
+
+char str_val[64];
+int int_val = 0;
+
+// property names for reading tab json
+const char *info_prop = "info";
+const char *info_title_prop = "title";
+const char *info_track_name_prop = "track_name";
+const char *info_tempo_prop = "tempo";
+const char *tab_prop = "tab";
+const char *tab_measures_prop = "measures";
+const char *tab_beats_prop = "beats";
+const char *tab_beat_number_prop = "number";
+const char *fret_prop = "fret";
+const char *string_prop = "string";
 
 
 bool isTabPlaying = false;
@@ -69,6 +83,10 @@ static esp_err_t lookup_servo(uint8_t string, uint8_t fret, guitar_fret_servo_t 
     return ESP_OK;
 }
 
+
+
+/***************************************************************************************************/
+// Play tab functions
 
 
 /// @brief play a note given a string and fret
@@ -214,6 +232,345 @@ esp_err_t reset_string(uint8_t string, uint8_t fret_offset){
 }
 
 
+/// @brief Create the guitar tab struct, ensuring enough memory allocated for the beats
+/// @param name 
+/// @param tempo 
+/// @param n_beats 
+/// @return 
+guitar_tab_t *guitar_tab_create(const char *name, uint16_t tempo, size_t n_beats)
+{
+    tab = calloc(1, sizeof(guitar_tab_t) + n_beats * sizeof(beat_t));
+    if (tab == NULL) return NULL;
+
+    strncpy(tab->name, name, sizeof(tab->name) - 1);   // calloc already zeroed the terminator
+    tab->tempo = tempo;
+    tab->n_beats = n_beats;
+    return tab;
+}
+
+
+
+int get_tab_beat_count(jparse_ctx_t *jctx)
+{
+    ESP_LOGI(GB_TAG, "Get tab beat count");
+
+    int n_measure_beats = 0;
+    int fret = 0;
+    int string = 0;
+    int beat_count = 0;
+    int measure_count = 0;
+
+    /* Read the tab music (broken into measures - beats - notes) */
+    if (json_obj_get_object(jctx, tab_prop) != OS_SUCCESS) {
+        ESP_LOGE(GB_TAG, "Error reading json tab property");
+        return ESP_ERR_NOT_FOUND;
+    }
+    else{
+        // Read the measures
+        if (json_obj_get_array(jctx, tab_measures_prop, &measure_count) == OS_SUCCESS) {
+            /* Initialize the guitar tab object */
+            if(measure_count > 0){
+                for(int i = 0; i < measure_count; i++){
+                    // Get the measure object
+                    if (json_arr_get_object(jctx, i) == OS_SUCCESS){
+                        // Get the measure beats array
+                        if(json_obj_get_array(jctx, tab_beats_prop, &n_measure_beats) == OS_SUCCESS) {
+                            if(n_measure_beats > 0)
+                            {
+                                // Loop through each beat of the measure
+                                for(int j = 0; j < n_measure_beats; j++){
+                                    // printf("beat[%d/%d]\n", j, n_measure_beats);
+                                    beat_count++; // increment the beat count
+                                }
+                           }
+                            json_obj_leave_array(jctx);
+                        }
+                        json_arr_leave_object(jctx);
+                    }
+                }
+            }
+		    json_obj_leave_array(jctx);
+	    }
+		json_obj_leave_object(jctx);
+	}
+
+    return beat_count;
+}
+
+
+/// @brief Extract the measures/beats/notes from the tab
+/// @param jctx Json context object
+/// @param n_measures number of measures read in the tab
+/// @param n_beats number of beats read in the tab
+/// @param beats array of beats
+/// @return 
+esp_err_t read_tab_notes(jparse_ctx_t *jctx, int n_beats)
+{
+    ESP_LOGI(GB_TAG, "Reading json tab property");
+
+    int n_measure_beats = 0;
+    int fret = 0;
+    int string = 0;
+    int beat_count = 0;
+    int measure_count = 0;
+
+    // beats = calloc(1, sizeof(beat_t) * n_beats); // initialize an empty beat array
+
+    /* Read the tab music (broken into measures - beats - notes) */
+    if (json_obj_get_object(jctx, tab_prop) != OS_SUCCESS) {
+        ESP_LOGE(GB_TAG, "Error reading json tab property");
+        return ESP_ERR_NOT_FOUND;
+    }
+    else{
+		printf("reading tab object\n");
+		
+        // Read the measures
+        if (json_obj_get_array(jctx, tab_measures_prop, &measure_count) == OS_SUCCESS) {
+            printf("%d measures\n", measure_count);
+            /* Initialize the guitar tab object */
+            if(measure_count > 0){
+                for(int i = 0; i < measure_count; i++){
+                    // Get the measure object
+                    if (json_arr_get_object(jctx, i) == OS_SUCCESS){
+
+                        // Get the measure beats array
+                        if(json_obj_get_array(jctx, tab_beats_prop, &n_measure_beats) == OS_SUCCESS) {
+                            ESP_LOGI(GB_TAG, "measure[%d/%d] has %d beats", i, measure_count, n_measure_beats);
+
+                            if(n_measure_beats > 0)
+                            {
+                                // Loop through each beat of the measure
+                                for(int j = 0; j < n_measure_beats; j++){
+                                    // ESP_LOGI(GB_TAG, "beat[%d/%d]\n", j, n_measure_beats);
+
+                                    // Get the note
+                                    if (json_arr_get_object(jctx, j) == OS_SUCCESS){
+
+                                        // Initialize the beat
+                                        int n_notes = 1; // TODO: hardcoded
+                                        // tab->beats[beat_count].n_notes = n_notes;
+                                        tab->beats[beat_count].n_notes = n_notes;
+                                        tab->beats[beat_count].num = beat_count;
+                                        tab->beats[i].notes = calloc(1, sizeof(note_t) * n_notes);
+
+                                        if (json_obj_get_int(jctx, string_prop, &string) == OS_SUCCESS) tab->beats[i].notes[0].string = string;
+                                        else tab->beats[i].notes[0].string = STRING_FRET_VALUE_NULL; // Set to 255 (null)
+
+                                        if (json_obj_get_int(jctx, fret_prop, &fret) == OS_SUCCESS) tab->beats[i].notes[0].fret = fret;
+                                        else tab->beats[i].notes[0].fret = STRING_FRET_VALUE_NULL; // Set to 255 (null)
+
+                                        ESP_LOGI(GB_TAG, "Beat[%d/%d]: string %d, fret %d", beat_count, n_beats, tab->beats[i].notes[0].string, tab->beats[i].notes[0].fret);
+
+                                        json_arr_leave_object(jctx);
+                                    } 
+                                    else{
+                                        ESP_LOGE(GB_TAG, "Couldn't read note object");
+                                    }
+
+                                    beat_count++; // increment the beat count
+                                }
+                           }
+                            json_obj_leave_array(jctx);
+                        }
+                        json_arr_leave_object(jctx);
+                    }
+                }
+            }
+		    json_obj_leave_array(jctx);
+	    }
+		json_obj_leave_object(jctx);
+	}
+
+    return ESP_OK;
+}
+
+
+
+
+esp_err_t parse_tab(char *json_str)
+{
+    ESP_LOGI(GB_TAG, "Parsing json");
+    // TODO: ensure valid json
+
+	jparse_ctx_t jctx;
+	char tab_name[64];
+    uint16_t tempo = 60;
+    int beat_count = 0;
+    beat_t **beats;
+
+    int ret = json_parse_start(&jctx, json_str, strlen(json_str));
+	if (ret != OS_SUCCESS) {
+		ESP_LOGE(GB_TAG, "Error parsing json");
+		return ESP_ERR_INVALID_ARG;
+	}
+
+	/* Read the tab overview info (song name, tempo, etc) */
+    if (json_obj_get_object(&jctx, info_prop) == OS_SUCCESS) {
+		printf("reading info object\n");
+		if (json_obj_get_string(&jctx, info_title_prop, str_val, sizeof(str_val)) == OS_SUCCESS) {
+			printf("Title: %s\n", str_val);
+			strcpy(tab_name, str_val);
+		}
+        if (json_obj_get_string(&jctx, info_track_name_prop, str_val, sizeof(str_val)) == OS_SUCCESS) {
+			printf("Track name: %s\n", str_val);
+		}
+			
+        if (json_obj_get_int(&jctx, info_tempo_prop, &int_val) == OS_SUCCESS){
+            printf("Tempo %d\n", int_val);
+            tempo = int_val;
+        } 
+		json_obj_leave_object(&jctx);
+	}
+
+    /* Read the tab music (broken into measures - beats - notes) */
+    beat_count = get_tab_beat_count(&jctx); // Get the beat count
+    if(beat_count > 0){
+        ESP_LOGI(GB_TAG, "Beat count = %d", beat_count);
+        // Initialize the guitar_tab_t
+        guitar_tab_create(tab_name, tempo, beat_count);
+        
+        read_tab_notes(&jctx, beat_count);
+    }
+    else{
+        ESP_LOGE(GB_TAG, "No beats detected");
+    }
+
+	json_parse_end(&jctx);
+
+    return ESP_OK;
+}
+
+
+
+/// @brief Read the guitar tab from the SD card file
+/// @param file_path 
+/// @return 
+esp_err_t read_tab(const char *file_path)
+{
+    ESP_LOGI(GB_TAG, "Reading guitar tab: %s", file_path);
+    esp_err_t err;
+    
+    // Read the SD card file
+    // FILE* tab_file = Open_File(file_path);
+    // err = s_example_read_file(file_path);
+    err = sd_read_file(file_path);
+    if(err != ESP_OK){
+        ESP_LOGE(GB_TAG, "Error reading guitar tab: %s", esp_err_to_name(err));
+    }
+
+    // parse the file content as json
+    err = parse_tab(file_buffer);
+    if(err != ESP_OK){
+        ESP_LOGE(GB_TAG, "Error parsing guitar tab json: %s", esp_err_to_name(err));
+    }
+
+
+    // Clear up memory
+    // free(file_buffer);
+    
+    return ESP_OK;
+}
+
+
+
+/*****************************************************************************************************/
+// initialisation
+
+
+void setup_bridge_servo(servo_t *servo, uint8_t servo_num, uint8_t top_string, uint8_t bottom_string, guitar_bridge_servo_t *out_bridge_servos)
+{
+    ESP_LOGI(GB_TAG, "Initialize bridge servo channel %u", servo_num);
+
+    if(out_bridge_servos == NULL || servo_num >= N_SERVOS || servo == NULL){
+        ESP_LOGE(GB_TAG, "Create servo failed - check servo is initialized");
+        return;
+    }
+
+    guitar_bridge_servo_t *bridge_servo = &out_bridge_servos[servo_num]; // Get the pointer to the current servo being set up
+    bridge_servo->servo = servo;
+    bridge_servo->top_string = top_string;
+    bridge_servo->bottom_string = bottom_string;
+    bridge_servo->current_angle = SERVO_ANGLE_DEFAULT;
+    bridge_servo->top_string_angle = SERVO_ANGLE_TOP;
+    bridge_servo->bottom_string_angle = SERVO_ANGLE_BOTTOM;
+}
+
+
+void setup_fret_servo(servo_t *servo, uint8_t servo_num, uint8_t fret_num, uint8_t top_string, uint8_t bottom_string, guitar_fret_servo_t *out_fret_servos)
+{
+    ESP_LOGI(GB_TAG, "Initialize fret servo channel %u", servo_num);
+
+    if(out_fret_servos == NULL || servo_num >= N_SERVOS || servo == NULL){
+        ESP_LOGE(GB_TAG, "Create servo failed - check servo is initialized");
+        return;
+    }
+
+    guitar_fret_servo_t *fret_servo = &out_fret_servos[servo_num]; // Get the pointer to the current servo being set up
+    fret_servo->servo = servo;
+    fret_servo->top_string = top_string;
+    fret_servo->bottom_string = bottom_string;
+    fret_servo->fret = fret_num;
+    fret_servo->prefered_string = top_string;
+    fret_servo->current_angle = SERVO_ANGLE_DEFAULT;
+    fret_servo->top_string_angle = SERVO_ANGLE_TOP;
+    fret_servo->bottom_string_angle = SERVO_ANGLE_BOTTOM;
+
+}
+
+
+// Guitarbot initialisation
+esp_err_t guitarbot_init(servo_t servos[], guitar_fret_servo_t **out_fret_servos, guitar_bridge_servo_t **out_bridge_servos)
+{
+    ESP_LOGI(GB_TAG, "Initializing GuitarBot");
+    esp_err_t err;
+
+    if(!servos){
+        ESP_LOGE(GB_TAG, "Guitarbot initialization failed: invalid arguments");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    servos_arr = servos;
+
+    // Setup the servo configuration for Guitarbot
+    int n_fret_servos = N_SERVOS - N_BRIDGE_SERVOS; // Remaining servos after provisioning bridge servos
+    guitar_bridge_servo_t *_bridge_servos = calloc(N_BRIDGE_SERVOS, sizeof(guitar_bridge_servo_t)); // initialize the array with empty values
+    guitar_fret_servo_t *_fret_servos = calloc(N_FRET_SERVOS, sizeof(guitar_fret_servo_t)); // initialize the array with empty values
+
+    ESP_LOGI(GB_TAG, "Setting up bridge");
+    // Setup bridge servo pairs E-A, D-G, B-E
+    int offset = 0;
+    for(int b=0; b<N_BRIDGE_SERVOS; b++){
+        setup_bridge_servo(&servos[b], b, b+offset, b+1+offset, _bridge_servos);
+        offset++;
+    }
+
+    ESP_LOGI(GB_TAG, "Setting up frets");
+    // setup fret servos pairs 1/E-A, 1/D-G, 1/D-G, 2/E-A ...
+    int fret = 0;
+    int top_string = 0;
+    int bottom_string = 0;
+    for(int f=0; f<n_fret_servos; f++){
+        uint8_t pair = f % 3; // servos are grouped into 3 per fret
+        fret = f / 3 + 1;
+        top_string = pair * 2; // E D B strings
+        bottom_string = pair * 2 + 1; // A G e strings
+        
+        setup_fret_servo(&servos[f+N_BRIDGE_SERVOS], f, fret, top_string, bottom_string, _fret_servos);
+    }
+
+    fret_servos = _fret_servos;
+    bridge_servos = _bridge_servos;
+
+    *out_fret_servos = _fret_servos;
+    *out_bridge_servos = _bridge_servos;
+    
+    setupComplete = true;
+
+    return ESP_OK;
+
+}
+
+
 
 esp_err_t test_play()
 {
@@ -280,127 +637,6 @@ esp_err_t test_play()
 }
 
 
-esp_err_t read_tab(const char *file_path)
-{
-    ESP_LOGI(GB_TAG, "Reading guitar tab: %s", file_path);
-    esp_err_t err;
-    
-    // Read the SD card file
-    // FILE* tab_file = Open_File(file_path);
-    // err = s_example_read_file(file_path);
-    err = sd_read_file(file_path);
-    if(err != ESP_OK){
-        ESP_LOGE(GB_TAG, "Error reading guitar tab: %s", esp_err_to_name(err));
-    }
-
-    // parse the file content as json
-    jparse_ctx_t jctx;
-    err = parse_json(&jctx, file_buffer);
-    if(err != ESP_OK){
-        ESP_LOGE(GB_TAG, "Error parsing guitar tab json: %s", esp_err_to_name(err));
-    }
-    
-    
-
-    return ESP_OK;
-}
-
-
-
-void setup_bridge_servo(servo_t *servo, uint8_t servo_num, uint8_t top_string, uint8_t bottom_string, guitar_bridge_servo_t *out_bridge_servos)
-{
-    ESP_LOGI(GB_TAG, "Initialize bridge servo channel %u", servo_num);
-
-    if(out_bridge_servos == NULL || servo_num >= N_SERVOS || servo == NULL){
-        ESP_LOGE(GB_TAG, "Create servo failed - check servo is initialized");
-        return;
-    }
-
-    guitar_bridge_servo_t *bridge_servo = &out_bridge_servos[servo_num]; // Get the pointer to the current servo being set up
-    bridge_servo->servo = servo;
-    bridge_servo->top_string = top_string;
-    bridge_servo->bottom_string = bottom_string;
-    bridge_servo->current_angle = SERVO_ANGLE_DEFAULT;
-    bridge_servo->top_string_angle = SERVO_ANGLE_TOP;
-    bridge_servo->bottom_string_angle = SERVO_ANGLE_BOTTOM;
-}
-
-
-void setup_fret_servo(servo_t *servo, uint8_t servo_num, uint8_t fret_num, uint8_t top_string, uint8_t bottom_string, guitar_fret_servo_t *out_fret_servos)
-{
-    ESP_LOGI(GB_TAG, "Initialize fret servo channel %u", servo_num);
-
-    if(out_fret_servos == NULL || servo_num >= N_SERVOS || servo == NULL){
-        ESP_LOGE(GB_TAG, "Create servo failed - check servo is initialized");
-        return;
-    }
-
-    guitar_fret_servo_t *fret_servo = &out_fret_servos[servo_num]; // Get the pointer to the current servo being set up
-    fret_servo->servo = servo;
-    fret_servo->top_string = top_string;
-    fret_servo->bottom_string = bottom_string;
-    fret_servo->fret = fret_num;
-    fret_servo->prefered_string = top_string;
-    fret_servo->current_angle = SERVO_ANGLE_DEFAULT;
-    fret_servo->top_string_angle = SERVO_ANGLE_TOP;
-    fret_servo->bottom_string_angle = SERVO_ANGLE_BOTTOM;
-
-}
-
-
-
-esp_err_t guitarbot_init(servo_t servos[], guitar_fret_servo_t **out_fret_servos, guitar_bridge_servo_t **out_bridge_servos)
-{
-    ESP_LOGI(GB_TAG, "Initializing GuitarBot");
-    esp_err_t err;
-
-    if(!servos){
-        ESP_LOGE(GB_TAG, "Guitarbot initialization failed: invalid arguments");
-        return ESP_ERR_INVALID_ARG;
-    }
-
-    servos_arr = servos;
-
-    // Setup the servo configuration for Guitarbot
-    int n_fret_servos = N_SERVOS - N_BRIDGE_SERVOS; // Remaining servos after provisioning bridge servos
-    guitar_bridge_servo_t *_bridge_servos = calloc(N_BRIDGE_SERVOS, sizeof(guitar_bridge_servo_t)); // initialize the array with empty values
-    guitar_fret_servo_t *_fret_servos = calloc(N_FRET_SERVOS, sizeof(guitar_fret_servo_t)); // initialize the array with empty values
-
-    ESP_LOGI(GB_TAG, "Setting up bridge");
-    // Setup bridge servo pairs E-A, D-G, B-E
-    int offset = 0;
-    for(int b=0; b<N_BRIDGE_SERVOS; b++){
-        setup_bridge_servo(&servos[b], b, b+offset, b+1+offset, _bridge_servos);
-        offset++;
-    }
-
-    ESP_LOGI(GB_TAG, "Setting up frets");
-    // setup fret servos pairs 1/E-A, 1/D-G, 1/D-G, 2/E-A ...
-    int fret = 0;
-    int top_string = 0;
-    int bottom_string = 0;
-    for(int f=0; f<n_fret_servos; f++){
-        uint8_t pair = f % 3; // servos are grouped into 3 per fret
-        fret = f / 3 + 1;
-        top_string = pair * 2; // E D B strings
-        bottom_string = pair * 2 + 1; // A G e strings
-        
-        setup_fret_servo(&servos[f+N_BRIDGE_SERVOS], f, fret, top_string, bottom_string, _fret_servos);
-    }
-
-    fret_servos = _fret_servos;
-    bridge_servos = _bridge_servos;
-
-    *out_fret_servos = _fret_servos;
-    *out_bridge_servos = _bridge_servos;
-    
-    setupComplete = true;
-
-    return ESP_OK;
-
-}
-
-
 
 /*********************************************************************************/
 // helper functions
@@ -410,4 +646,11 @@ esp_err_t guitarbot_init(servo_t servos[], guitar_fret_servo_t **out_fret_servos
 uint8_t get_fret_count()
 {
     return N_FRET_SERVOS / 3;
+}
+
+/// @brief Reset the tab - free memory
+/// @return 
+esp_err_t reset_tab()
+{
+    free(tab);
 }

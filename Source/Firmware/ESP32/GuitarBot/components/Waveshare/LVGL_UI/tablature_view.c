@@ -16,6 +16,7 @@ lv_obj_t * button;
 
 lv_obj_t * lv_create_button(lv_obj_t * parent);
 static void file_clicked_event_handler(lv_event_t * e);
+static void menu_event_cb(lv_event_t * e);
 
 
 /// @brief Get the files from the SD card
@@ -41,6 +42,7 @@ lv_obj_t *_lv_tablature_view_create(lv_obj_t * parent)
     // lv_obj_set_size(menu, lv_disp_get_hor_res(NULL), lv_disp_get_ver_res(NULL));
     lv_obj_set_size(menu, lv_pct(100), lv_pct(100));
     lv_obj_center(menu);
+    lv_obj_add_event_cb(menu, menu_event_cb, LV_EVENT_CLICKED, NULL);
 
     /*Create a sub page*/
     lv_obj_t * sub_page = lv_menu_page_create(menu, NULL);
@@ -107,6 +109,27 @@ static void btn_play_event_handler(lv_event_t * e)
           if(setup_complete()){
             test_play();
           }
+        }
+    }
+}
+
+
+static void menu_event_cb(lv_event_t * e)
+{
+    lv_event_code_t code = lv_event_get_code(e);
+    lv_obj_t * menu = lv_event_get_target(e);
+
+    if(code == LV_EVENT_CLICKED) {
+        LV_LOG_USER("Clicked");
+
+        // Check if back button was clicked
+        lv_obj_t * back_btn = lv_event_get_current_target(e); 
+        if(lv_menu_back_btn_is_root(menu, back_btn)) {
+            ESP_LOGI(TAB_UI_TAG, "Root back button pressed!\n");
+        } else {
+            ESP_LOGI(TAB_UI_TAG, "Subpage back button pressed!\n");
+            // TODO: reset guitar bot tab
+            reset_tab();
         }
     }
 }
